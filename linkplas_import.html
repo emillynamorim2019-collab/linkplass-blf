@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Importar Dados — Link Plas</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f2f5;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;}
+.box{background:#fff;border-radius:14px;padding:36px 44px;box-shadow:0 4px 20px rgba(0,0,0,0.1);text-align:center;max-width:460px;}
+h2{color:#0A1128;font-size:22px;margin-bottom:8px;}
+p{color:#666;font-size:14px;line-height:1.6;margin-bottom:24px;}
+.btn{background:#0A1128;color:#fff;border:none;padding:14px 32px;border-radius:9px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;}
+.btn:hover{background:#1a2a4a;}
+.btn:disabled{background:#ccc;cursor:not-allowed;}
+#log{margin-top:20px;font-size:13px;color:#444;text-align:left;max-height:220px;overflow-y:auto;background:#f9f9f9;border-radius:8px;padding:12px;display:none;}
+.ok{color:#34A853;}
+.err{color:#EA4335;}
+</style>
+</head>
+<body>
+<div class="box">
+  <h2>📥 Importar Dados Lucas</h2>
+  <p>Importa as lubrificações de <b>agosto e setembro/2026</b> para o Firebase do dashboard Link Plas.<br>Execute apenas uma vez.</p>
+  <button class="btn" id="btn" onclick="importar()">Importar agora</button>
+  <div id="log"></div>
+</div>
+
+<script>
+firebase.initializeApp({
+  apiKey:"AIzaSyCSN7YtYqpPHutTnCe63LCOCVIhIUC4qKI",
+  authDomain:"orcamento-blf.firebaseapp.com",
+  projectId:"orcamento-blf",
+  storageBucket:"orcamento-blf.firebasestorage.app",
+  messagingSenderId:"172752829087",
+  appId:"1:172752829087:web:1bef7559d3d103154980aa"
+});
+var db = firebase.firestore();
+
+var DADOS = {
+  '2026-08': {
+    mes:'2026-08',
+    obs:[],
+    frase:'',
+    injetoras:{
+      'INJ074':{lubrificada:true, dataLub:'03/08'},
+      'INJ024':{lubrificada:true, dataLub:'04/08'},
+      'INJ083':{lubrificada:true, dataLub:'05/08'},
+      'INJ057':{lubrificada:true, dataLub:'10/08'},
+      'INJ044':{lubrificada:true, dataLub:'10/08'},
+      'INJ058':{lubrificada:true, dataLub:'10/08'},
+      'INJ032':{lubrificada:true, dataLub:'11/08'},
+      'INJ026':{lubrificada:true, dataLub:'11/08'},
+      'INJ082':{lubrificada:true, dataLub:'11/08'},
+      'INJ066':{lubrificada:true, dataLub:'11/08'},
+      'INJ061':{lubrificada:true, dataLub:'12/08'},
+      'INJ077':{lubrificada:true, dataLub:'12/08'},
+      'INJ054':{lubrificada:true, dataLub:'12/08'},
+      'INJ048':{lubrificada:true, dataLub:'13/08'},
+      'INJ047':{lubrificada:true, dataLub:'13/08', obs:'manipulador com alguns pontos e patins quebrados.'},
+      'INJ084':{lubrificada:true, dataLub:'13/08'},
+      'INJ062':{lubrificada:true, dataLub:'13/08'},
+      'INJ063':{lubrificada:true, dataLub:'17/08'},
+      'INJ055':{lubrificada:true, dataLub:'17/08'},
+      'INJ025':{lubrificada:true, dataLub:'17/08'},
+      'INJ045':{lubrificada:true, dataLub:'18/08'},
+      'INJ056':{lubrificada:true, dataLub:'18/08'},
+      'INJ081':{lubrificada:true, dataLub:'18/08'},
+      'INJ087':{lubrificada:true, dataLub:'19/08'},
+      'INJ072':{lubrificada:true, dataLub:'19/08'},
+      'INJ080':{lubrificada:true, dataLub:'19/08'},
+      'INJ070':{lubrificada:true, dataLub:'20/08'},
+      'INJ086':{lubrificada:true, dataLub:'20/08'},
+      'INJ046':{lubrificada:true, dataLub:'20/08', obs:'Apenas a máquina, rever essa também'},
+      'INJ023':{lubrificada:true, dataLub:'21/08', obs:'faltou o manipulador'},
+      'INJ071':{lubrificada:true, dataLub:'24/08'},
+      'INJ068':{lubrificada:true, dataLub:'24/08'},
+      'INJ085':{lubrificada:true, dataLub:'26/08'},
+      'INJ079':{lubrificada:true, dataLub:'26/08'},
+      'INJ008':{lubrificada:true, dataLub:'26/08'},
+      'INJ029':{lubrificada:true, dataLub:'27/08'},
+      'INJ009':{lubrificada:true, dataLub:'31/08', obs:'manipulador não foi feito'},
+      'INJ013':{lubrificada:true, dataLub:'31/08', obs:'manipulador não foi feito'},
+      'INJ033':{lubrificada:true, dataLub:'31/08', obs:'manipulador não foi feito'},
+      'INJ059':{lubrificada:true, dataLub:'31/08', obs:'manipulador não foi feito'}
+    }
+  },
+  '2026-09': {
+    mes:'2026-09',
+    obs:[],
+    frase:'',
+    injetoras:{
+      'INJ076':{lubrificada:true, dataLub:'01/09'},
+      'INJ060':{lubrificada:true, dataLub:'02/09'},
+      'INJ030':{lubrificada:true, dataLub:'02/09'},
+      'INJ078':{lubrificada:true, dataLub:'02/09'},
+      'INJ031':{lubrificada:true, dataLub:'03/09'},
+      'INJ064':{lubrificada:true, dataLub:'03/09'},
+      'INJ073':{lubrificada:true, dataLub:'07/09'},
+      'INJ065':{lubrificada:true, dataLub:'07/09'}
+    }
+  }
+};
+
+function log(msg, tipo){
+  var el = document.getElementById('log');
+  el.style.display = 'block';
+  el.innerHTML += '<div class="'+(tipo||'')+'">' + msg + '</div>';
+  el.scrollTop = el.scrollHeight;
+}
+
+async function importar(){
+  var btn = document.getElementById('btn');
+  btn.disabled = true;
+  btn.textContent = 'Importando...';
+  log('Iniciando importação...');
+  try {
+    var meses = Object.keys(DADOS);
+    for(var i=0; i<meses.length; i++){
+      var id = meses[i];
+      await db.collection('linkplas_meses').doc(id).set(DADOS[id]);
+      var n = Object.keys(DADOS[id].injetoras).length;
+      log('✓ ' + id + ' — ' + n + ' injetoras importadas', 'ok');
+    }
+    log('✅ Importação concluída! Pode fechar esta aba e abrir o dashboard.', 'ok');
+    btn.textContent = 'Concluído!';
+  } catch(e){
+    log('❌ Erro: ' + e.message, 'err');
+    btn.disabled = false;
+    btn.textContent = 'Tentar novamente';
+  }
+}
+</script>
+</body>
+</html>
