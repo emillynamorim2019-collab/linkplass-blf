@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestão Financeira — BLF</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f2f5;color:#222;}
+.hdr{background:#0A1128;color:#fff;padding:0 28px;display:flex;align-items:center;gap:14px;height:58px;position:sticky;top:0;z-index:200;}
+.hdr img{width:30px;height:auto;}
+.hdr-brand{font-size:15px;font-weight:700;flex:1;}
+.hdr-brand span{color:#F5C518;}
+.hdr-right{display:flex;align-items:center;gap:10px;}
+.btn-edit{background:none;border:2px solid rgba(255,255,255,0.3);color:#fff;padding:6px 14px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;}
+.btn-edit:hover{border-color:#F5C518;color:#F5C518;}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:#34A853;flex-shrink:0;}
+.sync-dot.off{background:#EA4335;}
+.edit-bar{background:#FBBC04;color:#1a1a00;text-align:center;padding:6px;font-size:13px;font-weight:700;display:none;}
+.tabs-wrap{background:#fff;border-bottom:2px solid #eee;padding:0 28px;display:flex;gap:0;overflow-x:auto;}
+.tab{padding:14px 20px;font-size:13px;font-weight:600;color:#888;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;}
+.tab:hover{color:#0A1128;}
+.tab.active{color:#0A1128;border-bottom-color:#F5C518;}
+.panel{display:none;padding:24px 28px;max-width:1100px;margin:0 auto;}
+.panel.active{display:block;}
+
+/* SUMMARY CARDS */
+.sum-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px;}
+.sum-card{background:#fff;border-radius:12px;padding:18px 20px;box-shadow:0 1px 4px rgba(0,0,0,0.07);border-top:4px solid #eee;}
+.sum-card.azul{border-top-color:#0A1128;}
+.sum-card.verde{border-top-color:#34A853;}
+.sum-card.vermelho{border-top-color:#EA4335;}
+.sum-card.amarelo{border-top-color:#FBBC04;}
+.sum-val{font-size:22px;font-weight:900;color:#0A1128;margin-bottom:3px;}
+.sum-label{font-size:11px;color:#999;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;}
+
+/* ALERTS */
+.alerts-section{margin-bottom:22px;}
+.alerts-title{font-size:13px;font-weight:700;color:#0A1128;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;}
+.alert-cards{display:flex;flex-direction:column;gap:8px;}
+.alert-card{background:#fff;border-radius:10px;padding:14px 18px;display:flex;align-items:center;gap:14px;box-shadow:0 1px 4px rgba(0,0,0,0.07);}
+.alert-card.atrasado{border-left:4px solid #EA4335;}
+.alert-card.avencer{border-left:4px solid #FBBC04;}
+.alert-badge{font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;white-space:nowrap;}
+.badge-atrasado{background:#fee;color:#c00;}
+.badge-avencer{background:#fff8e1;color:#b8860b;}
+.badge-pago{background:#e8f5e9;color:#2e7d32;}
+.badge-pendente{background:#f5f5f5;color:#666;}
+.alert-info{flex:1;}
+.alert-cliente{font-size:14px;font-weight:700;color:#0A1128;}
+.alert-det{font-size:12px;color:#888;margin-top:2px;}
+.alert-val{font-size:15px;font-weight:800;color:#0A1128;white-space:nowrap;}
+.btn-wpp{background:#25D366;color:#fff;border:none;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
+.btn-wpp:hover{background:#1da851;}
+
+/* NOTAS TABLE */
+.section-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;}
+.section-hdr h2{font-size:17px;font-weight:800;color:#0A1128;}
+.btn-add{background:#0A1128;color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:none;}
+.btn-add:hover{background:#1a2a4a;}
+.edit-mode .btn-add{display:inline-block;}
+.filter-bar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+.filter-btn{background:#fff;border:2px solid #eee;color:#888;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;}
+.filter-btn.active{border-color:#0A1128;color:#0A1128;background:#f0f2f5;}
+.notas-list{display:flex;flex-direction:column;gap:10px;}
+.nota-card{background:#fff;border-radius:10px;padding:16px 20px;box-shadow:0 1px 4px rgba(0,0,0,0.07);display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.nota-card.atrasado{border-left:4px solid #EA4335;}
+.nota-card.avencer{border-left:4px solid #FBBC04;}
+.nota-card.pago{border-left:4px solid #34A853;opacity:0.75;}
+.nota-card.pendente{border-left:4px solid #ddd;}
+.nota-main{flex:1;min-width:200px;}
+.nota-cliente{font-size:15px;font-weight:700;color:#0A1128;}
+.nota-nf{font-size:11px;color:#aaa;font-weight:600;text-transform:uppercase;}
+.nota-val{font-size:17px;font-weight:900;color:#0A1128;white-space:nowrap;}
+.nota-vcto{font-size:12px;color:#888;margin-top:2px;}
+.nota-obs{font-size:11px;color:#999;margin-top:4px;font-style:italic;}
+.nota-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.btn-pagar{background:#34A853;color:#fff;border:none;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:none;}
+.btn-pagar:hover{background:#2a7a40;}
+.edit-mode .btn-pagar{display:inline-block;}
+.btn-del{background:none;border:2px solid #eee;color:#ccc;padding:6px 10px;border-radius:8px;font-size:12px;cursor:pointer;display:none;}
+.btn-del:hover{border-color:#EA4335;color:#EA4335;}
+.edit-mode .btn-del{display:inline-block;}
+.empty-state{text-align:center;padding:48px;color:#bbb;font-size:14px;}
+
+/* MODAL */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;display:none;align-items:center;justify-content:center;}
+.modal-bg.open{display:flex;}
+.modal{background:#fff;border-radius:14px;padding:28px;width:100%;max-width:440px;box-shadow:0 8px 32px rgba(0,0,0,0.15);}
+.modal h3{font-size:18px;font-weight:800;color:#0A1128;margin-bottom:20px;}
+.form-group{margin-bottom:14px;}
+.form-group label{display:block;font-size:12px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px;}
+.form-group input,.form-group select,.form-group textarea{width:100%;border:1.5px solid #e0e0e0;border-radius:8px;padding:10px 12px;font-size:14px;font-family:inherit;outline:none;}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:#0A1128;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.modal-actions{display:flex;gap:10px;margin-top:20px;}
+.btn-confirm{flex:1;background:#0A1128;color:#fff;border:none;padding:12px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;}
+.btn-confirm:hover{background:#1a2a4a;}
+.btn-cancel{background:none;border:2px solid #eee;color:#888;padding:12px 18px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;}
+.btn-cancel:hover{border-color:#ccc;}
+
+/* GASTOS */
+.gastos-sum{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:22px;}
+.gastos-list{display:flex;flex-direction:column;gap:10px;}
+.gasto-card{background:#fff;border-radius:10px;padding:14px 20px;box-shadow:0 1px 4px rgba(0,0,0,0.07);display:flex;align-items:center;gap:14px;border-left:4px solid #EA4335;}
+.gasto-main{flex:1;}
+.gasto-desc{font-size:14px;font-weight:700;color:#0A1128;}
+.gasto-cat{font-size:11px;color:#aaa;text-transform:uppercase;font-weight:600;margin-top:2px;}
+.gasto-data{font-size:12px;color:#888;margin-top:2px;}
+.gasto-val{font-size:16px;font-weight:900;color:#EA4335;white-space:nowrap;}
+
+/* ANALISE */
+.analise-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;}
+.chart-card{background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,0.07);}
+.chart-card h3{font-size:13px;font-weight:700;color:#0A1128;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:14px;}
+.chart-wrap{position:relative;height:220px;}
+.ranking-list{display:flex;flex-direction:column;gap:10px;}
+.ranking-item{display:flex;align-items:center;gap:12px;}
+.rank-num{font-size:12px;font-weight:700;color:#aaa;width:20px;}
+.rank-bar-wrap{flex:1;height:10px;background:#f0f0f0;border-radius:5px;overflow:hidden;}
+.rank-bar{height:100%;background:#0A1128;border-radius:5px;}
+.rank-nome{font-size:13px;font-weight:700;color:#0A1128;min-width:100px;}
+.rank-val{font-size:13px;font-weight:700;color:#0A1128;white-space:nowrap;}
+</style>
+</head>
+<body>
+<script>
+firebase.initializeApp({
+  apiKey:"AIzaSyCSN7YtYqpPHutTnCe63LCOCVIhIUC4qKI",
+  authDomain:"orcamento-blf.firebaseapp.com",
+  projectId:"orcamento-blf",
+  storageBucket:"orcamento-blf.firebasestorage.app",
+  messagingSenderId:"172752829087",
+  appId:"1:172752829087:web:1bef7559d3d103154980aa"
+});
+var db = firebase.firestore();
+</script>
+
+<div id="app">
+  <div class="hdr">
+    <div style="width:32px;height:32px;background:#F5C518;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:11px;color:#0A1128;flex-shrink:0;">BLF</div>
+    <div class="hdr-brand">BLF <span>·</span> Gestão Financeira</div>
+    <div class="hdr-right">
+      <button class="btn-edit" id="btn-edit" onclick="toggleEdit()">✏️ Editar</button>
+      <span class="sync-dot" id="sync-dot"></span>
+    </div>
+  </div>
+  <div class="edit-bar" id="edit-bar">✏️ MODO EDIÇÃO ATIVO</div>
+  <div class="tabs-wrap">
+    <div class="tab active" onclick="abrirAba('receber',this)">💰 Contas a Receber</div>
+    <div class="tab" onclick="abrirAba('gastos',this)">📤 Gastos</div>
+    <div class="tab" onclick="abrirAba('analise',this)">📊 Análise</div>
+  </div>
+
+  <div class="panel active" id="panel-receber">
+    <div id="receber-content"></div>
+  </div>
+  <div class="panel" id="panel-gastos">
+    <div id="gastos-content"></div>
+  </div>
+  <div class="panel" id="panel-analise">
+    <div id="analise-content"></div>
+  </div>
+</div>
+
+<!-- Modal Nota -->
+<div class="modal-bg" id="modal-nota">
+  <div class="modal">
+    <h3 id="modal-nota-title">Nova Nota Fiscal</h3>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Cliente</label>
+        <input type="text" id="f-cliente" placeholder="Ex: Berneck"/>
+      </div>
+      <div class="form-group">
+        <label>NF Nº</label>
+        <input type="text" id="f-nf" placeholder="Ex: 10"/>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Valor (R$)</label>
+        <input type="number" id="f-valor" placeholder="0,00" step="0.01"/>
+      </div>
+      <div class="form-group">
+        <label>Vencimento</label>
+        <input type="date" id="f-vencimento"/>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Observação</label>
+      <input type="text" id="f-obs" placeholder="Ex: 2ª parcela, serviço X..."/>
+    </div>
+    <input type="hidden" id="f-edit-id"/>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="fecharModal('modal-nota')">Cancelar</button>
+      <button class="btn-confirm" onclick="salvarNota()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Gasto -->
+<div class="modal-bg" id="modal-gasto">
+  <div class="modal">
+    <h3>Novo Gasto</h3>
+    <div class="form-group">
+      <label>Descrição</label>
+      <input type="text" id="g-desc" placeholder="Ex: Combustível, Aluguel..."/>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Categoria</label>
+        <select id="g-cat">
+          <option>Combustível</option>
+          <option>Manutenção</option>
+          <option>Material</option>
+          <option>Pessoal</option>
+          <option>Aluguel</option>
+          <option>Impostos</option>
+          <option>Fornecedor</option>
+          <option>Outros</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Valor (R$)</label>
+        <input type="number" id="g-valor" placeholder="0,00" step="0.01"/>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Data</label>
+      <input type="date" id="g-data"/>
+    </div>
+    <div class="form-group">
+      <label>Observação</label>
+      <input type="text" id="g-obs" placeholder="Opcional"/>
+    </div>
+    <input type="hidden" id="g-edit-id"/>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="fecharModal('modal-gasto')">Cancelar</button>
+      <button class="btn-confirm" onclick="salvarGasto()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var SENHA = 'blf2026';
+var isEditMode = false;
+var notasCache = [];
+var gastosCache = [];
+var abaAtiva = 'receber';
+var chartAnalise = null;
+
+// ===== FIREBASE =====
+db.collection('fin_notas').orderBy('criadoEm','desc').onSnapshot(function(snap){
+  notasCache = snap.docs.map(function(d){return Object.assign({id:d.id},d.data());});
+  renderAbaAtiva();
+  document.getElementById('sync-dot').className='sync-dot';
+},function(){document.getElementById('sync-dot').className='sync-dot off';});
+
+db.collection('fin_gastos').orderBy('data','desc').onSnapshot(function(snap){
+  gastosCache = snap.docs.map(function(d){return Object.assign({id:d.id},d.data());});
+  renderAbaAtiva();
+});
+
+// ===== UTILS =====
+function hoje(){return new Date();}
+function parseDate(s){if(!s)return null;var p=s.split('-');return new Date(p[0],p[1]-1,p[2]);}
+function diasAte(dateStr){
+  var d=parseDate(dateStr);
+  if(!d)return null;
+  var diff=Math.ceil((d-hoje())/(1000*60*60*24));
+  return diff;
+}
+function statusNota(n){
+  if(n.pago) return 'pago';
+  var d=diasAte(n.vencimento);
+  if(d===null) return 'pendente';
+  if(d<0) return 'atrasado';
+  if(d<=7) return 'avencer';
+  return 'pendente';
+}
+function fmtVal(v){return 'R$ '+parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmtData(s){if(!s)return '—';var p=s.split('-');return p[2]+'/'+p[1]+'/'+p[0];}
+function fmtDataBr(s){return fmtData(s);}
+
+// ===== EDIT MODE =====
+function toggleEdit(){
+  if(isEditMode){isEditMode=false;}
+  else{
+    var s=prompt('Senha de edição:');
+    if(s===SENHA){isEditMode=true;}
+    else if(s!==null){alert('Senha incorreta.');return;}
+    else return;
+  }
+  document.getElementById('btn-edit').textContent=isEditMode?'🔒 Sair':'✏️ Editar';
+  document.getElementById('edit-bar').style.display=isEditMode?'block':'none';
+  document.getElementById('app').className=isEditMode?'edit-mode':'';
+  renderAbaAtiva();
+}
+
+function abrirAba(aba,el){
+  abaAtiva=aba;
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
+  if(el) el.classList.add('active');
+  document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('active');});
+  document.getElementById('panel-'+aba).classList.add('active');
+  renderAbaAtiva();
+}
+
+function renderAbaAtiva(){
+  if(abaAtiva==='receber') renderReceber();
+  else if(abaAtiva==='gastos') renderGastos();
+  else renderAnalise();
+}
+
+// ===== CONTAS A RECEBER =====
+var filtroAtivo='todos';
+function renderReceber(){
+  var pendente=0,atrasado=0,avencer=0,recebido=0;
+  notasCache.forEach(function(n){
+    var s=statusNota(n);
+    if(s==='pago') recebido+=parseFloat(n.valor||0);
+    else if(s==='atrasado') atrasado+=parseFloat(n.valor||0);
+    else if(s==='avencer') avencer+=parseFloat(n.valor||0);
+    else pendente+=parseFloat(n.valor||0);
+  });
+  var totalPendente=pendente+atrasado+avencer;
+
+  var html='<div class="sum-grid">';
+  html+='<div class="sum-card azul"><div class="sum-val">'+fmtVal(totalPendente)+'</div><div class="sum-label">Total a receber</div></div>';
+  html+='<div class="sum-card verde"><div class="sum-val">'+fmtVal(recebido)+'</div><div class="sum-label">Já recebido</div></div>';
+  html+='<div class="sum-card amarelo"><div class="sum-val">'+fmtVal(avencer)+'</div><div class="sum-label">Vence em 7 dias</div></div>';
+  html+='<div class="sum-card vermelho"><div class="sum-val">'+fmtVal(atrasado)+'</div><div class="sum-label">Em atraso</div></div>';
+  html+='</div>';
+
+  // Alertas
+  var alertas=notasCache.filter(function(n){var s=statusNota(n);return s==='atrasado'||s==='avencer';});
+  if(alertas.length){
+    html+='<div class="alerts-section"><div class="alerts-title">⚠️ Alertas</div><div class="alert-cards">';
+    alertas.forEach(function(n){
+      var s=statusNota(n);
+      var dias=diasAte(n.vencimento);
+      var txt=s==='atrasado'?'Atrasado '+Math.abs(dias)+' dia(s)':(dias===0?'Vence hoje':'Vence em '+dias+' dia(s)');
+      var wppTxt=s==='atrasado'
+        ?'Olá, '+n.cliente+'! Passando para avisar que a NF '+n.nf+' no valor de '+fmtVal(n.valor)+' está em atraso desde '+fmtData(n.vencimento)+'. Por favor, verifique o pagamento. Qualquer dúvida, estamos à disposição! Att, BLF.'
+        :'Olá, '+n.cliente+'! Passando para lembrar que a NF '+n.nf+' no valor de '+fmtVal(n.valor)+' vence em '+fmtData(n.vencimento)+'. Qualquer dúvida, estamos à disposição! Att, BLF.';
+      html+='<div class="alert-card '+s+'">';
+      html+='<span class="alert-badge badge-'+s+'">'+txt+'</span>';
+      html+='<div class="alert-info"><div class="alert-cliente">'+n.cliente+'</div><div class="alert-det">NF '+n.nf+' · Venc. '+fmtData(n.vencimento)+'</div></div>';
+      html+='<div class="alert-val">'+fmtVal(n.valor)+'</div>';
+      html+='<button class="btn-wpp" onclick="copiarWpp(\''+encodeURIComponent(wppTxt)+'\')">📱 Copiar msg</button>';
+      html+='</div>';
+    });
+    html+='</div></div>';
+  }
+
+  // Lista notas
+  html+='<div class="section-hdr"><h2>Notas Fiscais</h2>';
+  html+='<button class="btn-add" onclick="abrirModalNota()">+ Nova NF</button></div>';
+
+  html+='<div class="filter-bar">';
+  ['todos','pendente','avencer','atrasado','pago'].forEach(function(f){
+    var labels={todos:'Todas',pendente:'Pendentes',avencer:'A vencer',atrasado:'Atrasadas',pago:'Pagas'};
+    html+='<button class="filter-btn'+(filtroAtivo===f?' active':'')+'" onclick="setFiltro(\''+f+'\')">'+labels[f]+'</button>';
+  });
+  html+='</div>';
+
+  var filtradas=notasCache.filter(function(n){return filtroAtivo==='todos'||statusNota(n)===filtroAtivo;});
+
+  if(!filtradas.length){
+    html+='<div class="empty-state">Nenhuma nota encontrada.</div>';
+  } else {
+    html+='<div class="notas-list">';
+    filtradas.forEach(function(n){
+      var s=statusNota(n);
+      var dias=diasAte(n.vencimento);
+      var txtDias=s==='pago'?'Pago em '+(n.dataPag||'—'):s==='atrasado'?'Atrasado '+Math.abs(dias)+'d':s==='avencer'?(dias===0?'Vence hoje':'Vence em '+dias+'d'):'Vence em '+fmtData(n.vencimento);
+      html+='<div class="nota-card '+s+'">';
+      html+='<div class="nota-main"><div class="nota-nf">NF '+n.nf+'</div><div class="nota-cliente">'+n.cliente+'</div>';
+      if(n.obs) html+='<div class="nota-obs">'+n.obs+'</div>';
+      html+='</div>';
+      html+='<div><div class="nota-val">'+fmtVal(n.valor)+'</div><div class="nota-vcto">'+txtDias+'</div></div>';
+      html+='<span class="alert-badge badge-'+s+'">'+{pago:'✓ Pago',atrasado:'Atrasado',avencer:'A vencer',pendente:'Pendente'}[s]+'</span>';
+      html+='<div class="nota-actions">';
+      if(s!=='pago') html+='<button class="btn-pagar" onclick="marcarPago(\''+n.id+'\')">✓ Pago</button>';
+      html+='<button class="btn-wpp" onclick="copiarWppNota(\''+n.id+'\')" title="Copiar mensagem">📱</button>';
+      html+='<button class="btn-del" onclick="deletarNota(\''+n.id+'\')">✕</button>';
+      html+='</div></div>';
+    });
+    html+='</div>';
+  }
+
+  document.getElementById('receber-content').innerHTML=html;
+}
+
+function setFiltro(f){filtroAtivo=f;renderReceber();}
+
+function copiarWpp(encoded){
+  var txt=decodeURIComponent(encoded);
+  navigator.clipboard.writeText(txt).then(function(){alert('Mensagem copiada! Cole no WhatsApp.');});
+}
+
+function copiarWppNota(id){
+  var n=notasCache.find(function(x){return x.id===id;});
+  if(!n) return;
+  var s=statusNota(n);
+  var txt=s==='atrasado'
+    ?'Olá, '+n.cliente+'! Passando para avisar que a NF '+n.nf+' no valor de '+fmtVal(n.valor)+' está em atraso desde '+fmtData(n.vencimento)+'. Por favor, verifique o pagamento. Qualquer dúvida, estamos à disposição! Att, BLF.'
+    :'Olá, '+n.cliente+'! Passando para lembrar que a NF '+n.nf+' no valor de '+fmtVal(n.valor)+' vence em '+fmtData(n.vencimento)+'. Qualquer dúvida, estamos à disposição! Att, BLF.';
+  navigator.clipboard.writeText(txt).then(function(){alert('Mensagem copiada! Cole no WhatsApp.');});
+}
+
+// ===== MODAL NOTA =====
+function abrirModalNota(id){
+  document.getElementById('f-cliente').value='';
+  document.getElementById('f-nf').value='';
+  document.getElementById('f-valor').value='';
+  document.getElementById('f-vencimento').value='';
+  document.getElementById('f-obs').value='';
+  document.getElementById('f-edit-id').value='';
+  document.getElementById('modal-nota-title').textContent='Nova Nota Fiscal';
+  if(id){
+    var n=notasCache.find(function(x){return x.id===id;});
+    if(n){
+      document.getElementById('f-cliente').value=n.cliente||'';
+      document.getElementById('f-nf').value=n.nf||'';
+      document.getElementById('f-valor').value=n.valor||'';
+      document.getElementById('f-vencimento').value=n.vencimento||'';
+      document.getElementById('f-obs').value=n.obs||'';
+      document.getElementById('f-edit-id').value=id;
+      document.getElementById('modal-nota-title').textContent='Editar Nota Fiscal';
+    }
+  }
+  document.getElementById('modal-nota').classList.add('open');
+}
+
+function fecharModal(id){document.getElementById(id).classList.remove('open');}
+
+function salvarNota(){
+  var cliente=document.getElementById('f-cliente').value.trim();
+  var nf=document.getElementById('f-nf').value.trim();
+  var valor=parseFloat(document.getElementById('f-valor').value);
+  var vencimento=document.getElementById('f-vencimento').value;
+  var obs=document.getElementById('f-obs').value.trim();
+  var editId=document.getElementById('f-edit-id').value;
+  if(!cliente||!valor||!vencimento){alert('Preencha cliente, valor e vencimento.');return;}
+  var data={cliente:cliente,nf:nf,valor:valor,vencimento:vencimento,obs:obs,pago:false,criadoEm:Date.now()};
+  if(editId){
+    db.collection('fin_notas').doc(editId).update({cliente:cliente,nf:nf,valor:valor,vencimento:vencimento,obs:obs});
+  } else {
+    db.collection('fin_notas').add(data);
+  }
+  fecharModal('modal-nota');
+}
+
+function marcarPago(id){
+  if(!isEditMode){return;}
+  var hoje=new Date().toISOString().split('T')[0];
+  db.collection('fin_notas').doc(id).update({pago:true,dataPag:fmtData(hoje)});
+}
+
+function deletarNota(id){
+  if(!isEditMode) return;
+  if(!confirm('Excluir esta nota?')) return;
+  db.collection('fin_notas').doc(id).delete();
+}
+
+// ===== GASTOS =====
+function renderGastos(){
+  var total=0,mesMes=0;
+  var mesAtual=new Date().toISOString().slice(0,7);
+  gastosCache.forEach(function(g){
+    var v=parseFloat(g.valor||0);
+    total+=v;
+    if(g.data&&g.data.slice(0,7)===mesAtual) mesMes+=v;
+  });
+  var totalRec=0;
+  notasCache.filter(function(n){return n.pago;}).forEach(function(n){totalRec+=parseFloat(n.valor||0);});
+
+  var html='<div class="gastos-sum">';
+  html+='<div class="sum-card vermelho"><div class="sum-val">'+fmtVal(total)+'</div><div class="sum-label">Total gastos</div></div>';
+  html+='<div class="sum-card vermelho"><div class="sum-val">'+fmtVal(mesMes)+'</div><div class="sum-label">Gastos este mês</div></div>';
+  html+='<div class="sum-card '+(totalRec-total>=0?'verde':'vermelho')+'"><div class="sum-val">'+fmtVal(totalRec-total)+'</div><div class="sum-label">Saldo (recebido − gastos)</div></div>';
+  html+='</div>';
+
+  html+='<div class="section-hdr"><h2>Registro de Gastos</h2>';
+  html+='<button class="btn-add" onclick="abrirModalGasto()">+ Novo Gasto</button></div>';
+
+  if(!gastosCache.length){
+    html+='<div class="empty-state">Nenhum gasto registrado ainda.</div>';
+  } else {
+    html+='<div class="gastos-list">';
+    gastosCache.forEach(function(g){
+      html+='<div class="gasto-card">';
+      html+='<div class="gasto-main"><div class="gasto-desc">'+g.descricao+'</div>';
+      html+='<div class="gasto-cat">'+g.categoria+'</div>';
+      html+='<div class="gasto-data">'+fmtData(g.data)+(g.obs?' · '+g.obs:'')+'</div></div>';
+      html+='<div><div class="gasto-val">'+fmtVal(g.valor)+'</div>';
+      html+='<div style="display:flex;gap:6px;margin-top:8px;">';
+      html+='<button class="btn-del" onclick="deletarGasto(\''+g.id+'\')" style="display:'+(isEditMode?'inline-block':'none')+'">✕</button>';
+      html+='</div></div></div>';
+    });
+    html+='</div>';
+  }
+  document.getElementById('gastos-content').innerHTML=html;
+}
+
+function abrirModalGasto(){
+  document.getElementById('g-desc').value='';
+  document.getElementById('g-valor').value='';
+  document.getElementById('g-data').value=new Date().toISOString().split('T')[0];
+  document.getElementById('g-obs').value='';
+  document.getElementById('g-edit-id').value='';
+  document.getElementById('modal-gasto').classList.add('open');
+}
+
+function salvarGasto(){
+  var desc=document.getElementById('g-desc').value.trim();
+  var cat=document.getElementById('g-cat').value;
+  var valor=parseFloat(document.getElementById('g-valor').value);
+  var data=document.getElementById('g-data').value;
+  var obs=document.getElementById('g-obs').value.trim();
+  if(!desc||!valor||!data){alert('Preencha descrição, valor e data.');return;}
+  db.collection('fin_gastos').add({descricao:desc,categoria:cat,valor:valor,data:data,obs:obs,criadoEm:Date.now()});
+  fecharModal('modal-gasto');
+}
+
+function deletarGasto(id){
+  if(!isEditMode) return;
+  if(!confirm('Excluir este gasto?')) return;
+  db.collection('fin_gastos').doc(id).delete();
+}
+
+// ===== ANÁLISE =====
+function renderAnalise(){
+  // Agrupar por cliente
+  var clientes={};
+  notasCache.forEach(function(n){
+    var c=n.cliente||'Sem cliente';
+    if(!clientes[c]) clientes[c]={total:0,pagas:0,qtd:0};
+    clientes[c].total+=parseFloat(n.valor||0);
+    clientes[c].qtd++;
+    if(n.pago) clientes[c].pagas+=parseFloat(n.valor||0);
+  });
+  var ranking=Object.keys(clientes).map(function(c){return{nome:c,total:clientes[c].total,qtd:clientes[c].qtd};});
+  ranking.sort(function(a,b){return b.total-a.total;});
+  var maxVal=ranking[0]?ranking[0].total:1;
+
+  // Gastos por categoria
+  var cats={};
+  gastosCache.forEach(function(g){
+    var c=g.categoria||'Outros';
+    if(!cats[c]) cats[c]=0;
+    cats[c]+=parseFloat(g.valor||0);
+  });
+
+  var totalRec=notasCache.filter(function(n){return n.pago;}).reduce(function(s,n){return s+parseFloat(n.valor||0);},0);
+  var totalPend=notasCache.filter(function(n){return !n.pago;}).reduce(function(s,n){return s+parseFloat(n.valor||0);},0);
+  var totalGastos=gastosCache.reduce(function(s,g){return s+parseFloat(g.valor||0);},0);
+
+  var html='<div class="analise-grid">';
+
+  // Ranking clientes
+  html+='<div class="chart-card"><h3>Ranking de Clientes por Faturamento</h3><div class="ranking-list">';
+  if(!ranking.length){html+='<p style="color:#aaa;font-size:13px">Sem dados ainda.</p>';}
+  ranking.slice(0,8).forEach(function(r,i){
+    html+='<div class="ranking-item">';
+    html+='<div class="rank-num">'+(i+1)+'</div>';
+    html+='<div class="rank-nome">'+r.nome+'</div>';
+    html+='<div class="rank-bar-wrap"><div class="rank-bar" style="width:'+Math.round(r.total/maxVal*100)+'%"></div></div>';
+    html+='<div class="rank-val">'+fmtVal(r.total)+'</div>';
+    html+='</div>';
+  });
+  html+='</div></div>';
+
+  // Fluxo geral
+  html+='<div class="chart-card"><h3>Visão Geral Financeira</h3><div class="chart-wrap"><canvas id="chart-analise"></canvas></div></div>';
+  html+='</div>';
+
+  // Stats
+  html+='<div class="sum-grid">';
+  html+='<div class="sum-card verde"><div class="sum-val">'+fmtVal(totalRec)+'</div><div class="sum-label">Total recebido</div></div>';
+  html+='<div class="sum-card azul"><div class="sum-val">'+fmtVal(totalPend)+'</div><div class="sum-label">A receber</div></div>';
+  html+='<div class="sum-card vermelho"><div class="sum-val">'+fmtVal(totalGastos)+'</div><div class="sum-label">Total gastos</div></div>';
+  html+='<div class="sum-card '+(totalRec-totalGastos>=0?'verde':'vermelho')+'"><div class="sum-val">'+fmtVal(totalRec-totalGastos)+'</div><div class="sum-label">Resultado líquido</div></div>';
+  html+='</div>';
+
+  document.getElementById('analise-content').innerHTML=html;
+
+  // Chart
+  var ctx=document.getElementById('chart-analise');
+  if(ctx){
+    if(chartAnalise) chartAnalise.destroy();
+    chartAnalise=new Chart(ctx,{
+      type:'bar',
+      data:{
+        labels:['Recebido','A receber','Gastos'],
+        datasets:[{
+          data:[totalRec,totalPend,totalGastos],
+          backgroundColor:['#34A853','#0A1128','#EA4335'],
+          borderRadius:6
+        }]
+      },
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{callback:function(v){return 'R$'+v.toLocaleString('pt-BR');}}}}}
+    });
+  }
+}
+</script>
+</body>
+</html>
