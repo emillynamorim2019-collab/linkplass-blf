@@ -103,14 +103,22 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f2f5;color:#222;}
 .btn-cancel:hover{border-color:#ccc;}
 
 /* GASTOS */
-.gastos-sum{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:22px;}
+.gastos-sum{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px;}
 .gastos-list{display:flex;flex-direction:column;gap:10px;}
 .gasto-card{background:#fff;border-radius:10px;padding:14px 20px;box-shadow:0 1px 4px rgba(0,0,0,0.07);display:flex;align-items:center;gap:14px;border-left:4px solid #EA4335;}
+.gasto-card.futuro{border-left-color:#0A1128;opacity:0.75;}
 .gasto-main{flex:1;}
 .gasto-desc{font-size:14px;font-weight:700;color:#0A1128;}
 .gasto-cat{font-size:11px;color:#aaa;text-transform:uppercase;font-weight:600;margin-top:2px;}
 .gasto-data{font-size:12px;color:#888;margin-top:2px;}
 .gasto-val{font-size:16px;font-weight:900;color:#EA4335;white-space:nowrap;}
+.gasto-val.futuro{color:#0A1128;}
+.mes-group{margin-bottom:20px;}
+.mes-hdr{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;background:#f0f2f5;border-radius:8px;margin-bottom:10px;cursor:pointer;user-select:none;}
+.mes-hdr-nome{font-size:13px;font-weight:800;color:#0A1128;text-transform:uppercase;letter-spacing:0.5px;}
+.mes-hdr-total{font-size:13px;font-weight:800;color:#EA4335;}
+.mes-body{display:flex;flex-direction:column;gap:8px;}
+.badge-futuro{background:#e8edf5;color:#0A1128;}
 
 /* ANALISE */
 .analise-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;}
@@ -202,6 +210,23 @@ var db = firebase.firestore();
   </div>
 </div>
 
+<!-- Modal Pagamento -->
+<div class="modal-bg" id="modal-pag">
+  <div class="modal">
+    <h3>✓ Confirmar Pagamento</h3>
+    <p style="font-size:14px;color:#555;margin-bottom:16px;">Registrar recebimento de <strong id="pag-nome"></strong></p>
+    <div class="form-group">
+      <label>Data de pagamento</label>
+      <input type="date" id="pag-data"/>
+    </div>
+    <input type="hidden" id="pag-id"/>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="fecharModal('modal-pag')">Cancelar</button>
+      <button class="btn-confirm" style="background:#34A853" onclick="confirmarPagamento()">Confirmar recebimento</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal Gasto -->
 <div class="modal-bg" id="modal-gasto">
   <div class="modal">
@@ -214,10 +239,11 @@ var db = firebase.firestore();
       <div class="form-group">
         <label>Categoria</label>
         <select id="g-cat">
+          <option>Funcionários</option>
+          <option>Sócios</option>
           <option>Combustível</option>
           <option>Manutenção</option>
           <option>Material</option>
-          <option>Pessoal</option>
           <option>Aluguel</option>
           <option>Impostos</option>
           <option>Fornecedor</option>
@@ -458,8 +484,20 @@ function salvarNota(){
 
 function marcarPago(id){
   if(!isEditMode){return;}
-  var hoje=new Date().toISOString().split('T')[0];
-  db.collection('fin_notas').doc(id).update({pago:true,dataPag:fmtData(hoje)});
+  var n=notasCache.find(function(x){return x.id===id;});
+  var nome=n?n.cliente+' NF '+n.nf:'esta nota';
+  // Abrir mini modal de pagamento
+  document.getElementById('pag-id').value=id;
+  document.getElementById('pag-nome').textContent=nome;
+  document.getElementById('pag-data').value=new Date().toISOString().split('T')[0];
+  document.getElementById('modal-pag').classList.add('open');
+}
+function confirmarPagamento(){
+  var id=document.getElementById('pag-id').value;
+  var data=document.getElementById('pag-data').value;
+  if(!data){alert('Informe a data de pagamento.');return;}
+  db.collection('fin_notas').doc(id).update({pago:true,dataPag:fmtData(data)});
+  fecharModal('modal-pag');
 }
 
 function deletarNota(id){
@@ -469,21 +507,37 @@ function deletarNota(id){
 }
 
 // ===== GASTOS =====
+var NOMES_MESES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+function nomeMes(chave){
+  if(!chave||chave==='0000-00') return 'Sem data';
+  var p=chave.split('-');
+  var m=parseInt(p[1],10)-1;
+  return NOMES_MESES[m]+' '+p[0];
+}
+function isFuturo(dataStr){
+  if(!dataStr) return false;
+  var hoje=new Date(); hoje.setHours(0,0,0,0);
+  var d=parseDate(dataStr);
+  return d&&d>hoje;
+}
+
 function renderGastos(){
-  var total=0,mesMes=0;
+  var total=0, mesMes=0, futuroTotal=0;
   var mesAtual=new Date().toISOString().slice(0,7);
   gastosCache.forEach(function(g){
     var v=parseFloat(g.valor||0);
     total+=v;
     if(g.data&&g.data.slice(0,7)===mesAtual) mesMes+=v;
+    if(isFuturo(g.data)) futuroTotal+=v;
   });
-  var totalRec=0;
-  notasCache.filter(function(n){return n.pago;}).forEach(function(n){totalRec+=parseFloat(n.valor||0);});
+  var totalRec=notasCache.filter(function(n){return n.pago;}).reduce(function(s,n){return s+parseFloat(n.valor||0);},0);
+  var saldo=totalRec-total;
 
   var html='<div class="gastos-sum">';
-  html+='<div class="sum-card vermelho"><div class="sum-val">'+fmtVal(total)+'</div><div class="sum-label">Total gastos</div></div>';
-  html+='<div class="sum-card vermelho"><div class="sum-val">'+fmtVal(mesMes)+'</div><div class="sum-label">Gastos este mês</div></div>';
-  html+='<div class="sum-card '+(totalRec-total>=0?'verde':'vermelho')+'"><div class="sum-val">'+fmtVal(totalRec-total)+'</div><div class="sum-label">Saldo (recebido − gastos)</div></div>';
+  html+='<div class="sum-card vermelho"><div class="sum-val">'+fmtVal(total)+'</div><div class="sum-label">Total saídas</div></div>';
+  html+='<div class="sum-card amarelo"><div class="sum-val">'+fmtVal(mesMes)+'</div><div class="sum-label">Saídas este mês</div></div>';
+  html+='<div class="sum-card '+(saldo>=0?'verde':'vermelho')+'"><div class="sum-val">'+fmtVal(saldo)+'</div><div class="sum-label">Total em caixa</div></div>';
+  html+='<div class="sum-card azul"><div class="sum-val">'+fmtVal(futuroTotal)+'</div><div class="sum-label">Saídas futuras</div></div>';
   html+='</div>';
 
   html+='<div class="section-hdr"><h2>Registro de Gastos</h2>';
@@ -492,18 +546,36 @@ function renderGastos(){
   if(!gastosCache.length){
     html+='<div class="empty-state">Nenhum gasto registrado ainda.</div>';
   } else {
-    html+='<div class="gastos-list">';
+    // Agrupar por mês
+    var grupos={};
     gastosCache.forEach(function(g){
-      html+='<div class="gasto-card">';
-      html+='<div class="gasto-main"><div class="gasto-desc">'+g.descricao+'</div>';
-      html+='<div class="gasto-cat">'+g.categoria+'</div>';
-      html+='<div class="gasto-data">'+fmtData(g.data)+(g.obs?' · '+g.obs:'')+'</div></div>';
-      html+='<div><div class="gasto-val">'+fmtVal(g.valor)+'</div>';
-      html+='<div style="display:flex;gap:6px;margin-top:8px;">';
-      html+='<button class="btn-del" onclick="deletarGasto(\''+g.id+'\')" style="display:'+(isEditMode?'inline-block':'none')+'">✕</button>';
-      html+='</div></div></div>';
+      var chave=g.data?g.data.slice(0,7):'0000-00';
+      if(!grupos[chave]) grupos[chave]={gastos:[],total:0};
+      grupos[chave].gastos.push(g);
+      grupos[chave].total+=parseFloat(g.valor||0);
     });
-    html+='</div>';
+    var chavesOrdenadas=Object.keys(grupos).sort().reverse();
+
+    chavesOrdenadas.forEach(function(chave){
+      var grp=grupos[chave];
+      html+='<div class="mes-group">';
+      html+='<div class="mes-hdr"><span class="mes-hdr-nome">'+nomeMes(chave)+'</span>';
+      html+='<span class="mes-hdr-total">− '+fmtVal(grp.total)+'</span></div>';
+      html+='<div class="mes-body">';
+      grp.gastos.forEach(function(g){
+        var futuro=isFuturo(g.data);
+        html+='<div class="gasto-card'+(futuro?' futuro':'')+'">';
+        html+='<div class="gasto-main"><div class="gasto-desc">'+g.descricao+'</div>';
+        html+='<div class="gasto-cat">'+g.categoria+(futuro?' · <span class="alert-badge badge-futuro" style="font-size:10px;padding:1px 7px;">Agendado</span>':'')+'</div>';
+        html+='<div class="gasto-data">'+fmtData(g.data)+(g.obs?' · '+g.obs:'')+'</div></div>';
+        html+='<div style="text-align:right">';
+        html+='<div class="gasto-val'+(futuro?' futuro':'')+'">'+fmtVal(g.valor)+'</div>';
+        html+='<div style="display:flex;gap:6px;margin-top:8px;justify-content:flex-end;">';
+        html+='<button class="btn-del" onclick="deletarGasto(\''+g.id+'\')" style="display:'+(isEditMode?'inline-block':'none')+'">✕</button>';
+        html+='</div></div></div>';
+      });
+      html+='</div></div>';
+    });
   }
   document.getElementById('gastos-content').innerHTML=html;
 }
